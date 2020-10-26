@@ -4,44 +4,79 @@ import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.json.JsonValue;
+import java.io.StringReader;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class HttpGateway {
+    private final static System.Logger LOG = System.getLogger(HttpGateway.class.getName());
 
-    public static CompletableFuture<List<JsonObject>> doAuthorizedGetForJsonList(String url, String accessToken) {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .header("Authorization", "Bearer " + accessToken)
-                .GET()
-                .build();
-        return HttpClient.newHttpClient()
-                .sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
-                .thenApply(HttpResponse::body)
-                .thenApply(is -> {
-                    try (JsonReader reader = Json.createReader(is)) {
-                        return reader.readArray().stream()
-                                .map(JsonValue::asJsonObject)
-                                .collect(Collectors.toList());
+    public static CompletableFuture<WebSocket> openJsonSocket(String endpoint, BiConsumer<JsonObject, WebSocket> messageHandler, Runnable closeHandler) {
+        return CompletableFuture.supplyAsync(() -> {
+            CountDownLatch latch = new CountDownLatch(1);
+            CompletableFuture<WebSocket> webSocketFuture = HttpClient.newHttpClient().newWebSocketBuilder().buildAsync(URI.create(endpoint), new WebSocket.Listener() {
+                @Override
+                public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
+                    JsonObject jsonObject;
+                    try (JsonReader reader = Json.createReader(new StringReader(data.toString()))) {
+                        jsonObject = reader.readObject();
                     }
-                });
+                    messageHandler.accept(jsonObject, webSocket);
+                    return WebSocket.Listener.super.onText(webSocket, data, last);
+                }
+
+                @Override
+                public void onOpen(WebSocket webSocket) {
+                    latch.countDown();
+                    WebSocket.Listener.super.onOpen(webSocket);
+                }
+
+                @Override
+                public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
+                    LOG.log(System.Logger.Level.ERROR, "socket closed with statusCode: " + statusCode + " and reason: " + reason);
+                    closeHandler.run();
+                    return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
+                }
+            });
+            try {
+                latch.await();
+            } catch (InterruptedException ex) {
+                throw new RuntimeException(ex);
+            }
+            return webSocketFuture.join();
+        });
     }
 
-    public static CompletableFuture<String> doAuthorizedJsonPost(String url, String token, JsonObject payload) {
-        String requestBody = payload.toString();
+    public static CompletableFuture<JsonObject> doAuthorizedGetForJsonObject(String url, Supplier<String> accessTokenSource, Map<String, List<String>> queryParams) {
+        HttpRequest request = buildAuthorizedGet(url, accessTokenSource, queryParams);
+        return doJsonResponseRequest(request, HttpGateway::readJsonObject);
+    }
+
+    public static CompletableFuture<List<JsonObject>> doAuthorizedGetForJsonList(String url, Supplier<String> accessTokenSource, Map<String, List<String>> queryParams) {
+        HttpRequest request = buildAuthorizedGet(url, accessTokenSource, queryParams);
+        return doJsonResponseRequest(request, HttpGateway::readJsonObjectList);
+    }
+
+    public static CompletableFuture<String> doAuthorizedJsonPost(String url, Supplier<String> accessTokenSource, JsonObject payload) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
+                .header("Authorization", "Bearer " + accessTokenSource.get())
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(payload.toString()))
                 .build();
         return HttpClient.newHttpClient()
                 .sendAsync(request, HttpResponse.BodyHandlers.discarding())
@@ -51,49 +86,72 @@ public class HttpGateway {
                 });
     }
 
-    public static CompletableFuture<Void> doAuthorizedJsonPut(String url, String token, JsonObject payload) {
-        String requestBody = payload.toString();
+    public static CompletableFuture<Void> doAuthorizedJsonPut(String url, Supplier<String> accessTokenSource, JsonObject payload) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
+                .header("Authorization", "Bearer " + accessTokenSource.get())
                 .header("Content-Type", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString(requestBody))
+                .PUT(HttpRequest.BodyPublishers.ofString(payload.toString()))
                 .build();
-        return HttpClient.newHttpClient()
-                .sendAsync(request, HttpResponse.BodyHandlers.discarding())
-                .thenApply(HttpResponse::body);
+        return doEmptyResponseRequest(request);
     }
 
-    public static CompletableFuture<Void> doAuthorizedJsonDelete(String url, String token) {
+    public static CompletableFuture<Void> doAuthorizedDelete(String url, Supplier<String> accessTokenSource) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
-                .header("Authorization", "Bearer " + token)
+                .header("Authorization", "Bearer " + accessTokenSource.get())
                 .DELETE()
                 .build();
-        return HttpClient.newHttpClient()
-                .sendAsync(request, HttpResponse.BodyHandlers.discarding())
-                .thenApply(HttpResponse::body);
+        return doEmptyResponseRequest(request);
     }
 
-    public static CompletableFuture<JsonObject> doUnauthorizedUrlEncodedPostForJsonObject(String url, Map<String, String> params) {
-        String requestBody = HttpGateway.urlEncode(params);
+    public static CompletableFuture<JsonObject> doUnauthorizedUrlEncodedPostForJsonObject(String url, Map<String, List<String>> params) {
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(HttpGateway.urlEncode(params)))
                 .build();
-        return HttpClient.newHttpClient().sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
+        return doJsonResponseRequest(request, HttpGateway::readJsonObject);
+    }
+
+    private static HttpRequest buildAuthorizedGet(String url, Supplier<String> accessTokenSource, Map<String, List<String>> queryParams) {
+        return HttpRequest.newBuilder()
+                .uri(URI.create(queryParams.isEmpty() ? url : url + "?" + urlEncode(queryParams)))
+                .header("Authorization", "Bearer " + accessTokenSource.get())
+                .GET()
+                .build();
+    }
+
+    private static CompletableFuture<Void> doEmptyResponseRequest(HttpRequest request) {
+        return HttpClient.newHttpClient()
+                .sendAsync(request, HttpResponse.BodyHandlers.discarding())
+                .thenApply(HttpResponse::body);
+    }
+
+    private static <T> CompletableFuture<T> doJsonResponseRequest(HttpRequest request, Function<JsonReader, T> mapper) {
+        return HttpClient.newHttpClient()
+                .sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
                 .thenApply(HttpResponse::body)
                 .thenApply(is -> {
                     try (JsonReader reader = Json.createReader(is)) {
-                        return reader.readObject();
+                        return mapper.apply(reader);
                     }
                 });
     }
 
-    public static String urlEncode(Map<String, String> pairs) {
+    private static JsonObject readJsonObject(JsonReader reader) {
+        return reader.readObject();
+    }
+
+    private static List<JsonObject> readJsonObjectList(JsonReader reader) {
+        return reader.readArray().stream()
+                .map(JsonValue::asJsonObject)
+                .collect(Collectors.toList());
+    }
+
+    public static String urlEncode(Map<String, List<String>> pairs) {
         return pairs.entrySet().stream()
-                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8) + "=" + URLEncoder.encode(String.join(",", e.getValue()), StandardCharsets.UTF_8))
                 .collect(Collectors.joining("&"));
     }
 }

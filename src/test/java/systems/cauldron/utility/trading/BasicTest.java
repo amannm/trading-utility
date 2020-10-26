@@ -2,9 +2,6 @@ package systems.cauldron.utility.trading;
 
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.util.Map;
-import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -51,43 +48,5 @@ public class BasicTest {
         assertFalse(refreshedTokenAfterAuthenticatorStopped.isEmpty());
 
         assertEquals(refreshedToken, refreshedTokenAfterAuthenticatorStopped);
-    }
-
-
-    @Test
-    public void ensureAccountDataWorks() {
-        AuthenticationService authenticator = new AuthenticationService();
-
-        Supplier<String> tokenSource = authenticator.start();
-
-        AccountService accountData = new AccountService(tokenSource);
-
-        accountData.printRawResponse();
-
-        Map<String, BigDecimal> availableCashBalances = accountData.getAvailableCashBalances().join();
-        assertFalse(availableCashBalances.isEmpty());
-        System.out.println(availableCashBalances);
-
-        authenticator.stop();
-    }
-
-    @Test
-    public void ensureSlingerWorks() {
-        AuthenticationService authenticator = new AuthenticationService();
-
-        Supplier<String> tokenSource = authenticator.start();
-
-        AccountService accountService = new AccountService(tokenSource);
-        OrderService orderService = new OrderService(tokenSource);
-
-        Slinger slinger = new Slinger(accountService, orderService);
-
-        slinger.execute("QQQ", BigDecimal.valueOf(280)).thenAccept(CompletableFuture::allOf).join();
-
-        Map<String, BigDecimal> availableCashBalances = accountService.getAvailableCashBalances().join();
-        assertFalse(availableCashBalances.isEmpty());
-        System.out.println(availableCashBalances);
-
-        authenticator.stop();
     }
 }

@@ -1,14 +1,8 @@
 package systems.cauldron.utility.trading;
 
-import javax.json.Json;
-import javax.json.JsonObject;
-import javax.json.JsonReader;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Collections;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executors;
@@ -57,12 +51,12 @@ public class AuthenticationService {
     }
 
     private CompletableFuture<Void> initialize() {
-        return doAuthenticationCall(Map.of(
-                "grant_type", "authorization_code",
-                "code", configuration.getAuthorizationCode(),
-                "client_id", configuration.getClientId(),
-                "redirect_uri", configuration.getRedirectUri(),
-                "access_type", "offline"
+        return HttpGateway.doUnauthorizedUrlEncodedPostForJsonObject(AUTHENTICATION_ENDPOINT, Map.of(
+                "grant_type", Collections.singletonList("authorization_code"),
+                "code", Collections.singletonList(configuration.getAuthorizationCode()),
+                "client_id", Collections.singletonList(configuration.getClientId()),
+                "redirect_uri", Collections.singletonList(configuration.getRedirectUri()),
+                "access_type", Collections.singletonList("offline")
         )).thenAccept(response -> {
             String initialAccessToken = response.getString("access_token");
             int initialTokenExpiresIn = response.getInt("expires_in");
@@ -83,10 +77,10 @@ public class AuthenticationService {
     }
 
     private CompletableFuture<Void> refresh(String refreshToken, ScheduledExecutorService refresher) {
-        return doAuthenticationCall(Map.of(
-                "grant_type", "refresh_token",
-                "refresh_token", refreshToken,
-                "client_id", configuration.getClientId()
+        return HttpGateway.doUnauthorizedUrlEncodedPostForJsonObject(AUTHENTICATION_ENDPOINT, Map.of(
+                "grant_type", Collections.singletonList("refresh_token"),
+                "refresh_token", Collections.singletonList(refreshToken),
+                "client_id", Collections.singletonList(configuration.getClientId())
         )).thenAccept(response -> {
             String accessToken = response.getString("access_token");
             int nextTokenExpiresIn = response.getInt("expires_in");
@@ -95,23 +89,6 @@ public class AuthenticationService {
             LOG.log(System.Logger.Level.INFO, "successfully refreshed access token: " + accessToken);
             LOG.log(System.Logger.Level.INFO, "next access token refresh: " + Instant.now().plus(nextTokenExpiresIn, ChronoUnit.SECONDS).toString());
         });
-    }
-
-    private static CompletableFuture<JsonObject> doAuthenticationCall(Map<String, String> params) {
-        String requestBody = HttpGateway.urlEncode(params);
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(AUTHENTICATION_ENDPOINT))
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-        HttpClient client = HttpClient.newHttpClient();
-        return client.sendAsync(request, HttpResponse.BodyHandlers.ofInputStream())
-                .thenApply(HttpResponse::body)
-                .thenApply(is -> {
-                    try (JsonReader reader = Json.createReader(is)) {
-                        return reader.readObject();
-                    }
-                });
     }
 
     private static void safeShutdown(ScheduledExecutorService service) {

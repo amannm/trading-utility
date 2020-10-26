@@ -43,14 +43,14 @@ public class OrderService {
     }
 
     private CompletableFuture<String> doCreateOrder(String accountId, JsonObject payload) {
-        return HttpGateway.doAuthorizedJsonPost(String.format(ACCOUNT_ORDERS_ENDPOINT, accountId), accessTokenSource.get(), payload);
+        return HttpGateway.doAuthorizedJsonPost(String.format(ACCOUNT_ORDERS_ENDPOINT, accountId), accessTokenSource, payload);
     }
 
     private CompletableFuture<Void> doUpdateOrder(String accountId, String orderId, JsonObject payload) {
-        return HttpGateway.doAuthorizedJsonPut(String.format(ACCOUNT_ORDER_ENDPOINT, accountId, orderId), accessTokenSource.get(), payload);
+        return HttpGateway.doAuthorizedJsonPut(String.format(ACCOUNT_ORDER_ENDPOINT, accountId, orderId), accessTokenSource, payload);
     }
 
     private CompletableFuture<Void> doDeleteOrder(String accountId, String orderId) {
-        return HttpGateway.doAuthorizedJsonDelete(String.format(ACCOUNT_ORDER_ENDPOINT, accountId, orderId), accessTokenSource.get());
+        return HttpGateway.doAuthorizedDelete(String.format(ACCOUNT_ORDER_ENDPOINT, accountId, orderId), accessTokenSource);
     }
 }
