@@ -13,16 +13,23 @@ repositories {
 }
 
 dependencies {
+    // json processing
     implementation('org.glassfish:javax.json:1+')
+
+    // unit testing
     testImplementation('org.junit.jupiter:junit-jupiter-api:5+')
     testImplementation('org.junit.jupiter:junit-jupiter-params:5+')
     testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5+')
 
-    compileOnly 'org.projectlombok:lombok:1.18.16'
-    annotationProcessor 'org.projectlombok:lombok:1.18.16'
+    // logging
+    implementation('org.apache.logging.log4j:log4j-api:2.13.3')
+    implementation('org.apache.logging.log4j:log4j-core:2.13.3')
 
-    testCompileOnly 'org.projectlombok:lombok:1.18.16'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.16'
+    // ergonomics
+    compileOnly('org.projectlombok:lombok:1.18.16')
+    annotationProcessor('org.projectlombok:lombok:1.18.16')
+    testCompileOnly('org.projectlombok:lombok:1.18.16')
+    testAnnotationProcessor('org.projectlombok:lombok:1.18.16')
 }
 
 java {

@@ -1,5 +1,8 @@
 package systems.cauldron.utility.trading;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Collections;
@@ -14,7 +17,7 @@ import java.util.function.Supplier;
 public class AuthenticationService {
 
     private static final String AUTHENTICATION_ENDPOINT = "https://api.tdameritrade.com/v1/oauth2/token";
-    private final static System.Logger LOG = System.getLogger(AuthenticationService.class.getName());
+    private final static Logger LOG = LogManager.getLogger(AuthenticationService.class);
 
     private final Configuration configuration;
 
@@ -67,9 +70,9 @@ public class AuthenticationService {
             safeShutdown(currentRefresher.getAndSet(refresher));
             reinitializer.schedule(() -> initialize().join(), refreshTokenExpiresIn, TimeUnit.SECONDS);
             currentAccessToken.set(initialAccessToken);
-            LOG.log(System.Logger.Level.INFO, "successfully initialized access token");
-            LOG.log(System.Logger.Level.INFO, "next access token refresh: " + Instant.now().plus(initialTokenExpiresIn, ChronoUnit.SECONDS).toString());
-            LOG.log(System.Logger.Level.INFO, "next refresh token initialization: " + Instant.now().plus(refreshTokenExpiresIn, ChronoUnit.SECONDS).toString());
+            LOG.info("successfully initialized access token");
+            LOG.info("next access token refresh: {}", Instant.now().plus(initialTokenExpiresIn, ChronoUnit.SECONDS).toString());
+            LOG.info("next refresh token initialization: {}", Instant.now().plus(refreshTokenExpiresIn, ChronoUnit.SECONDS).toString());
             configuration.setRefreshToken(refreshToken);
             configuration.setRefreshTokenExpiry(Instant.now().plus(refreshTokenExpiresIn, ChronoUnit.SECONDS));
             ConfigurationFactory.save(configuration);
@@ -86,8 +89,8 @@ public class AuthenticationService {
             int nextTokenExpiresIn = response.getInt("expires_in");
             refresher.schedule(() -> refresh(refreshToken, refresher).join(), nextTokenExpiresIn, TimeUnit.SECONDS);
             currentAccessToken.set(accessToken);
-            LOG.log(System.Logger.Level.INFO, "successfully refreshed access token: " + accessToken);
-            LOG.log(System.Logger.Level.INFO, "next access token refresh: " + Instant.now().plus(nextTokenExpiresIn, ChronoUnit.SECONDS).toString());
+            LOG.info("successfully refreshed access token:{}", accessToken);
+            LOG.info("next access token refresh: {}", Instant.now().plus(nextTokenExpiresIn, ChronoUnit.SECONDS).toString());
         });
     }
 
@@ -97,7 +100,7 @@ public class AuthenticationService {
             try {
                 service.awaitTermination(5L, TimeUnit.SECONDS);
             } catch (InterruptedException ex) {
-                LOG.log(System.Logger.Level.ERROR, "failed to safely terminate process", ex);
+                LOG.info("failed to safely terminate process", ex);
                 service.shutdownNow();
                 Thread.currentThread().interrupt();
             }

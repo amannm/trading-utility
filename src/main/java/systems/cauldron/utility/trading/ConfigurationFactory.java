@@ -1,5 +1,8 @@
 package systems.cauldron.utility.trading;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.json.Json;
 import javax.json.JsonNumber;
 import javax.json.JsonObject;
@@ -25,7 +28,7 @@ import java.util.Optional;
 
 public class ConfigurationFactory {
 
-    private final static System.Logger LOG = System.getLogger(ConfigurationFactory.class.getName());
+    private final static Logger LOG = LogManager.getLogger(ConfigurationFactory.class);
 
     private static final Path CONFIG_PATH = Paths.get(System.getProperty("user.home")).resolve(".tradingutility");
 
@@ -45,7 +48,7 @@ public class ConfigurationFactory {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        LOG.log(System.Logger.Level.INFO, "configuration saved to disk");
+        LOG.info("configuration saved to disk");
 
     }
 
@@ -63,7 +66,7 @@ public class ConfigurationFactory {
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
-        LOG.log(System.Logger.Level.INFO, "configuration loaded from disk");
+        LOG.info("configuration loaded from disk");
         return configuration;
     }
 

@@ -18,7 +18,6 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class HttpGateway {
-    private final static System.Logger LOG = System.getLogger(HttpGateway.class.getName());
 
     public static CompletableFuture<JsonObject> doAuthorizedGetForJsonObject(String url, Supplier<String> accessTokenSource, Map<String, List<String>> queryParams) {
         HttpRequest request = buildAuthorizedGet(url, accessTokenSource, queryParams);

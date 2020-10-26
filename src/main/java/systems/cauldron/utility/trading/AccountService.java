@@ -15,7 +15,6 @@ import java.util.stream.Collectors;
 
 public class AccountService {
 
-
     private static final String ACCOUNTS_ENDPOINT = "https://api.tdameritrade.com/v1/accounts";
 
     private final Supplier<String> accessTokenSource;

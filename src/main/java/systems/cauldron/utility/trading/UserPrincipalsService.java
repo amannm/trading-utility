@@ -1,5 +1,8 @@
 package systems.cauldron.utility.trading;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.json.JsonObject;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -14,7 +17,7 @@ import java.util.function.Supplier;
 
 public class UserPrincipalsService {
 
-    private final static System.Logger LOG = System.getLogger(UserPrincipalsService.class.getName());
+    private final static Logger LOG = LogManager.getLogger(UserPrincipalsService.class);
 
     private static final String USER_PRINCIPALS_ENDPOINT = "https://api.tdameritrade.com/v1/userprincipals";
     private static final String STREAMER_SUBSCRIPTION_KEYS_ENDPOINT = "https://api.tdameritrade.com/v1/userprincipals/streamersubscriptionkeys";

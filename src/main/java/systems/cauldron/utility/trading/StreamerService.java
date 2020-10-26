@@ -1,5 +1,8 @@
 package systems.cauldron.utility.trading;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
 import javax.json.Json;
 import javax.json.JsonArray;
 import javax.json.JsonNumber;
@@ -22,7 +25,7 @@ import java.util.function.Consumer;
 
 public class StreamerService {
 
-    private final static System.Logger LOG = System.getLogger(StreamerService.class.getName());
+    private final static Logger LOG = LogManager.getLogger(StreamerService.class);
 
     private final StreamerConfig config;
 
@@ -41,7 +44,7 @@ public class StreamerService {
         HttpClient.newHttpClient().newWebSocketBuilder().buildAsync(URI.create("wss://" + config.getSocketUrl() + "/ws"), new WebSocket.Listener() {
             @Override
             public CompletionStage<?> onText(WebSocket webSocket, CharSequence payload, boolean last) {
-                LOG.log(System.Logger.Level.INFO, "message received: " + payload.toString());
+                LOG.info("message received: {}", payload.toString());
                 JsonObject jsonObject;
                 try (JsonReader reader = Json.createReader(new StringReader(payload.toString()))) {
                     jsonObject = reader.readObject();
@@ -78,14 +81,14 @@ public class StreamerService {
 
             @Override
             public void onOpen(WebSocket webSocket) {
-                LOG.log(System.Logger.Level.INFO, "socket opened");
+                LOG.info("socket opened");
                 doLoginRequest(webSocket, openLatch);
                 WebSocket.Listener.super.onOpen(webSocket);
             }
 
             @Override
             public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                LOG.log(System.Logger.Level.ERROR, "socket closed with statusCode: " + statusCode + " and reason: " + reason);
+                LOG.error("socket closed with statusCode: {} and reason: {}", statusCode, reason);
                 return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
             }
         }).join();
@@ -94,7 +97,7 @@ public class StreamerService {
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
-        LOG.log(System.Logger.Level.INFO, "streamer started successfully");
+        LOG.info("streamer started successfully");
     }
 
     // TODO: do this properly
@@ -144,7 +147,7 @@ public class StreamerService {
                 }
             }
         });
-        LOG.log(System.Logger.Level.INFO, "streamer stopped successfully");
+        LOG.info("streamer stopped successfully");
     }
 
     private void doLoginRequest(WebSocket webSocket, CountDownLatch openLatch) {
@@ -195,7 +198,7 @@ public class StreamerService {
             String accountId = content.getString("1");
             String messageType = content.getString("2");
             String messageContent = content.getString("3");
-            LOG.log(System.Logger.Level.INFO, "accountId: " + accountId + " messageType: " + messageType + " messageContent: " + messageContent);
+            LOG.info("accountId: {} messageType: {} messageContent: {}", accountId, messageType, messageContent);
             switch (messageType) {
                 case "SUBSCRIBED":
                     socket.set(webSocket);
