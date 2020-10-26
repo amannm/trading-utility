@@ -4,62 +4,21 @@ import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonReader;
 import javax.json.JsonValue;
-import java.io.StringReader;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.net.http.WebSocket;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
-import java.util.concurrent.CountDownLatch;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 public class HttpGateway {
     private final static System.Logger LOG = System.getLogger(HttpGateway.class.getName());
-
-    public static CompletableFuture<WebSocket> openJsonSocket(String endpoint, BiConsumer<JsonObject, WebSocket> messageHandler, Runnable closeHandler) {
-        return CompletableFuture.supplyAsync(() -> {
-            CountDownLatch latch = new CountDownLatch(1);
-            CompletableFuture<WebSocket> webSocketFuture = HttpClient.newHttpClient().newWebSocketBuilder().buildAsync(URI.create(endpoint), new WebSocket.Listener() {
-                @Override
-                public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                    JsonObject jsonObject;
-                    try (JsonReader reader = Json.createReader(new StringReader(data.toString()))) {
-                        jsonObject = reader.readObject();
-                    }
-                    messageHandler.accept(jsonObject, webSocket);
-                    return WebSocket.Listener.super.onText(webSocket, data, last);
-                }
-
-                @Override
-                public void onOpen(WebSocket webSocket) {
-                    latch.countDown();
-                    WebSocket.Listener.super.onOpen(webSocket);
-                }
-
-                @Override
-                public CompletionStage<?> onClose(WebSocket webSocket, int statusCode, String reason) {
-                    LOG.log(System.Logger.Level.ERROR, "socket closed with statusCode: " + statusCode + " and reason: " + reason);
-                    closeHandler.run();
-                    return WebSocket.Listener.super.onClose(webSocket, statusCode, reason);
-                }
-            });
-            try {
-                latch.await();
-            } catch (InterruptedException ex) {
-                throw new RuntimeException(ex);
-            }
-            return webSocketFuture.join();
-        });
-    }
 
     public static CompletableFuture<JsonObject> doAuthorizedGetForJsonObject(String url, Supplier<String> accessTokenSource, Map<String, List<String>> queryParams) {
         HttpRequest request = buildAuthorizedGet(url, accessTokenSource, queryParams);

@@ -29,6 +29,7 @@ public class StreamerService {
     private final AtomicReference<WebSocket> socket = new AtomicReference<>();
     private final AtomicLong requestIdSource = new AtomicLong();
     private final Map<String, Consumer<JsonObject>> requestHandlers = new ConcurrentHashMap<>();
+    private final Map<String, Consumer<JsonObject>> dataHandlers = new ConcurrentHashMap<>();
 
     public StreamerService(StreamerConfig config) {
         this.config = config;
@@ -39,21 +40,40 @@ public class StreamerService {
         CountDownLatch openLatch = new CountDownLatch(1);
         HttpClient.newHttpClient().newWebSocketBuilder().buildAsync(URI.create("wss://" + config.getSocketUrl() + "/ws"), new WebSocket.Listener() {
             @Override
-            public CompletionStage<?> onText(WebSocket webSocket, CharSequence data, boolean last) {
-                LOG.log(System.Logger.Level.INFO, "message received: " + data.toString());
+            public CompletionStage<?> onText(WebSocket webSocket, CharSequence payload, boolean last) {
+                LOG.log(System.Logger.Level.INFO, "message received: " + payload.toString());
                 JsonObject jsonObject;
-                try (JsonReader reader = Json.createReader(new StringReader(data.toString()))) {
+                try (JsonReader reader = Json.createReader(new StringReader(payload.toString()))) {
                     jsonObject = reader.readObject();
                 }
                 JsonArray responses = jsonObject.getJsonArray("response");
                 if (responses != null) {
                     JsonObject response = responses.get(0).asJsonObject();
-                    Consumer<JsonObject> handler = requestHandlers.remove(response.getString("requestid"));
+                    String service = response.getString("service");
+                    String requestId = response.getString("requestid");
+                    Consumer<JsonObject> handler = null;
+                    switch (service) {
+                        case "ADMIN":
+                            handler = requestHandlers.remove(requestId);
+                            break;
+                        default:
+                            break;
+                    }
                     if (handler != null) {
                         handler.accept(response);
                     }
+                } else {
+                    JsonArray data = jsonObject.getJsonArray("data");
+                    if (data != null) {
+                        JsonObject dataItem = data.get(0).asJsonObject();
+                        String service = dataItem.getString("service");
+                        Consumer<JsonObject> dataHandler = dataHandlers.get(service);
+                        if (dataHandler != null) {
+                            dataHandler.accept(dataItem);
+                        }
+                    }
                 }
-                return WebSocket.Listener.super.onText(webSocket, data, last);
+                return WebSocket.Listener.super.onText(webSocket, payload, last);
             }
 
             @Override
@@ -140,7 +160,20 @@ public class StreamerService {
                         .add("token", config.getToken())
                         .add("version", "1.0"))
                 .build();
-        requestHandlers.put(requestId, response -> handleLoginResponse(webSocket, response, openLatch));
+        requestHandlers.put(requestId, response -> {
+            JsonNumber code = response.getJsonObject("content")
+                    .getJsonNumber("code");
+            if (code != null) {
+                switch (code.intValue()) {
+                    case 0:
+                        doAccountActivitySubscriptionRequest(webSocket, openLatch);
+                        break;
+                    case 3:
+                    default:
+                        throw new RuntimeException(response.getString("msg"));
+                }
+            }
+        });
         webSocket.sendText(loginRequest.toString(), true);
     }
 
@@ -154,25 +187,24 @@ public class StreamerService {
                 .add("source", config.getAppId())
                 .add("parameters", Json.createObjectBuilder()
                         .add("keys", config.getSubscriptionKey())
-                        .add("fields", "0,1,2,3"))
+                        .add("fields", "1,2,3"))
                 .build();
-        requestHandlers.put(requestId, response -> handleLoginResponse(webSocket, response, openLatch));
-        webSocket.sendText(loginRequest.toString(), true);
-    }
-
-    private void handleLoginResponse(WebSocket webSocket, JsonObject response, CountDownLatch openLatch) {
-        JsonNumber code = response.getJsonObject("content")
-                .getJsonNumber("code");
-        if (code != null) {
-            switch (code.intValue()) {
-                case 0:
+        dataHandlers.put("ACCT_ACTIVITY", dataResponse -> {
+            JsonArray contentList = dataResponse.getJsonArray("content");
+            JsonObject content = contentList.getJsonObject(0);
+            String accountId = content.getString("1");
+            String messageType = content.getString("2");
+            String messageContent = content.getString("3");
+            LOG.log(System.Logger.Level.INFO, "accountId: " + accountId + " messageType: " + messageType + " messageContent: " + messageContent);
+            switch (messageType) {
+                case "SUBSCRIBED":
                     socket.set(webSocket);
                     openLatch.countDown();
                     break;
-                case 3:
                 default:
-                    throw new RuntimeException(response.getString("msg"));
+                    break;
             }
-        }
+        });
+        webSocket.sendText(loginRequest.toString(), true);
     }
 }

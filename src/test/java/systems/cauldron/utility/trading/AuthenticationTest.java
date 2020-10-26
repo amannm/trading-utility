@@ -9,7 +9,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
-public class BasicTest {
+public class AuthenticationTest {
     @Test
     public void ensureSavedRefreshTokenWorks() {
         AuthenticationService authenticator = new AuthenticationService();
