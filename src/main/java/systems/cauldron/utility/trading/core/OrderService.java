@@ -1,4 +1,4 @@
-package systems.cauldron.utility.trading;
+package systems.cauldron.utility.trading.core;
 
 import javax.json.Json;
 import javax.json.JsonObject;

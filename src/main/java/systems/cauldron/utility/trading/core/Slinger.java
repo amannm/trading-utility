@@ -1,4 +1,4 @@
-package systems.cauldron.utility.trading;
+package systems.cauldron.utility.trading.core;
 
 import java.math.BigDecimal;
 import java.util.concurrent.CompletableFuture;

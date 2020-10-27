@@ -3,6 +3,12 @@ package systems.cauldron.utility.trading;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import systems.cauldron.utility.trading.core.AccountService;
+import systems.cauldron.utility.trading.core.AuthenticationService;
+import systems.cauldron.utility.trading.core.OrderService;
+import systems.cauldron.utility.trading.core.Slinger;
+import systems.cauldron.utility.trading.core.StreamerService;
+import systems.cauldron.utility.trading.core.UserPrincipalsService;
 
 import java.math.BigDecimal;
 import java.util.Map;
@@ -27,7 +33,6 @@ public class ServiceTest {
     public static void cleanup() {
         authenticator.stop();
     }
-
 
     @Test
     public void ensureAccountDataWorks() {

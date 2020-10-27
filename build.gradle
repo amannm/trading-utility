@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id "com.google.osdetector" version "1.6.2"
 }
 
 group 'systems.cauldron'
@@ -13,6 +14,25 @@ repositories {
 }
 
 dependencies {
+
+    // user interface
+    def platform = {
+        def os = osdetector.getOs();
+        switch (os) {
+            case 'windows':
+                return 'win'
+            case 'osx':
+                return 'mac'
+            case 'linux':
+                return 'linux'
+            default:
+                new Exception('no OpenJFX distribution available for platform: ' + os)
+        }
+    }()
+    implementation('org.openjfx:javafx-base:16+:' + platform)
+    implementation('org.openjfx:javafx-graphics:16+:' + platform)
+    implementation('org.openjfx:javafx-controls:16+:' + platform)
+
     // json processing
     implementation('org.glassfish:javax.json:1+')
 
@@ -22,18 +42,24 @@ dependencies {
     testRuntimeOnly('org.junit.jupiter:junit-jupiter-engine:5+')
 
     // logging
-    implementation('org.apache.logging.log4j:log4j-api:2.13.3')
-    implementation('org.apache.logging.log4j:log4j-core:2.13.3')
+    implementation('org.apache.logging.log4j:log4j-api:2+')
+    implementation('org.apache.logging.log4j:log4j-core:2+')
 
-    // ergonomics
-    compileOnly('org.projectlombok:lombok:1.18.16')
-    annotationProcessor('org.projectlombok:lombok:1.18.16')
-    testCompileOnly('org.projectlombok:lombok:1.18.16')
-    testAnnotationProcessor('org.projectlombok:lombok:1.18.16')
+    // developer ergonomics
+    compileOnly('org.projectlombok:lombok:1+')
+    annotationProcessor('org.projectlombok:lombok:1+')
+    testCompileOnly('org.projectlombok:lombok:1+')
+    testAnnotationProcessor('org.projectlombok:lombok:1+')
+
 }
 
 java {
     modularity.inferModulePath = true
+}
+
+application {
+    mainModule.set('systems.cauldron.utility.trading')
+    mainClass.set('systems.cauldron.utility.trading.Application')
 }
 
 jar {

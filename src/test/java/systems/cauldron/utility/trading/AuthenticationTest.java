@@ -1,6 +1,7 @@
 package systems.cauldron.utility.trading;
 
 import org.junit.jupiter.api.Test;
+import systems.cauldron.utility.trading.core.AuthenticationService;
 
 import java.util.function.Supplier;
 

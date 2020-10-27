@@ -1,4 +1,4 @@
-package systems.cauldron.utility.trading;
+package systems.cauldron.utility.trading.core;
 
 import lombok.Getter;
 import lombok.Setter;
